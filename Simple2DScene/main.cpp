@@ -9,6 +9,9 @@
 **/
 
 #define GL_SILENCE_DEPRECATION
+#define GL_GLEXT_PROTOTYPES 1
+#define LOG(argument) std::cout << argument << std::endl;
+#define STB_IMAGE_IMPLEMENTATION
 
 #ifdef _WINDOWS
 #include <GL/glew.h>
@@ -21,6 +24,12 @@
 #include "glm/mat4x4.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "ShaderProgram.h"
+
+#include "stb_image.h"
+
+// Useful values:
+const float MILLISECONDS_IN_SECOND = 1000.0f;
+
 
 // Display Window
 SDL_Window* displayWindow;
@@ -47,21 +56,72 @@ TO = 1.0;
 
 
 // Textures
-const char V_SHADER_PATH[] = "shaders/vertex.glsl";
-const char F_SHADER_PATH[] = "shaders/fragment.glsl";
+const char V_SHADER_PATH[] = "shaders/vertex_textured.glsl";
+const char F_SHADER_PATH[] = "shaders/fragment_textured.glsl";
 
-//const char texture1[],
-//           texture2[];
+const char texture1[] = "assets/godot.png",
+          texture2[] = "assets/unity.png";
+
+GLuint object_texture_id;
+GLuint object2_texture_id;
 
 ShaderProgram g_program;
-ShaderProgram g_program2;
+// ShaderProgram g_program2;
 glm::mat4 g_view_matrix; // cam orientation
 glm::mat4 g_projection_matrix; //cam characteristics
-glm::mat4 g_triangle1_matrix; //pos matrix of triangle 1
-glm::mat4 g_triangle2_matrix; //pos matrix of triangle 2
+glm::mat4 g_object1_matrix; //pos matrix of object 1
+glm::mat4 g_object2_matrix; //pos matrix of object 2
 
+// Tranforms
+glm::vec3 g_object1_position = glm::vec3(0.0f, 0.0f, 0.0f);
+float g_object1_x = 0.0f;
+float g_object1_y = 0.0f;
+float g_object1_rotate = 0.0f;
+
+glm::vec3 g_object2_position = glm::vec3(0.0f, 0.0f, 0.0f);
+float g_object2_x = 0.0f;
+float g_object2_y = 0.0f;
+float g_object2_rotate = 0.0f;
+
+// glm::vec3 g_object_movement = glm::vec3(0.0f, 0.0f, 0.0f);
 
 bool gameIsRunning = true;
+
+const int NUMBER_OF_TEXTURES = 1; // to be generated, that is
+const GLint LEVEL_OF_DETAIL = 0; // base image level; Level n is the nth mipmap reduction image
+const GLint TEXTURE_BORDER = 0; // this value MUST be zero
+
+
+
+
+
+GLuint load_texture(const char* filepath) {
+    int width, height, number_of_components;
+    unsigned char* image = stbi_load(filepath, &width, &height, &number_of_components, STBI_rgb_alpha);
+
+    if (image == NULL) {
+        LOG("Unable to load image");
+        assert(false);
+    }
+
+    GLuint textureID;
+    glGenTextures(NUMBER_OF_TEXTURES, &textureID);
+
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+
+    glTexImage2D(
+        GL_TEXTURE_2D, LEVEL_OF_DETAIL, GL_RGBA,
+        width, height,
+        TEXTURE_BORDER, GL_RGBA, GL_UNSIGNED_BYTE,
+        image
+    );
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    stbi_image_free(image);
+    return textureID;
+}
 
 
 void initialize() {
@@ -76,26 +136,38 @@ void initialize() {
 
     glViewport(VIEWPORT_X, VIEWPORT_Y, VIEWPORT_WIDTH, VIEWPORT_HEIGHT); // initialize cam
     g_program.load(V_SHADER_PATH, F_SHADER_PATH); // loading shaders
-    g_program2.load(V_SHADER_PATH, F_SHADER_PATH);
+    //g_program2.load(V_SHADER_PATH, F_SHADER_PATH);
+
+    object_texture_id = load_texture(texture1);
+    object2_texture_id = load_texture(texture2);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 
     g_view_matrix = glm::mat4(1.0f);
-    g_triangle1_matrix = glm::mat4(1.0f);
-    g_triangle2_matrix = glm::mat4(1.0f);
+    g_object1_matrix = glm::mat4(1.0f);
+    g_object2_matrix = glm::mat4(1.0f);
     g_projection_matrix = glm::ortho(-5.0f, 5.0f, -3.75f, 3.75f, -1.0f, 1.0f);
 
     g_program.set_view_matrix(g_view_matrix);
     g_program.set_projection_matrix(g_projection_matrix);
+
+    /*
     g_program2.set_view_matrix(g_view_matrix);
     g_program2.set_projection_matrix(g_projection_matrix);
+    */
 
-    g_program.set_colour(TR, TB, TG, TO);
+
+    //g_program.set_colour(TR, TB, TG, TO);
     glUseProgram(g_program.get_program_id());
+    /*
     g_program2.set_colour(1.0f, 1.0f, 1.0f, 1.0f);
     glUseProgram(g_program2.get_program_id());
-
+    */
     //Background color
     glClearColor(BG_RED, BG_BLUE, BG_GREEN, BG_ALPHA);
+
+    LOG(g_object2_x);
 }
 
 
@@ -108,40 +180,126 @@ void process_input() {
     }
 }
 
+float g_previous_ticks = 0.0f;
+
 void update() {
 
 
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // Draw Shapes Here
+    float ticks = (float)SDL_GetTicks() / MILLISECONDS_IN_SECOND;
+    float delta_time = ticks - g_previous_ticks;
+    g_previous_ticks = ticks;
 
+    float xaccel = 0.001f * delta_time;
+    float yaccel = 0.001f * delta_time;
+    
+    // Do transformations here
+    if (g_object2_x >= 100) {
+        xaccel = -xaccel;
+    }
+    else if (g_object2_x <= 0) {
+        xaccel = -xaccel;
+    }
+    if (g_object2_y >= 100) {
+        yaccel = -yaccel;
+    }
+    else if (g_object2_y <= 0) {
+        yaccel = -yaccel;
+    }
+    
+    g_object2_x += xaccel;
+    g_object2_y += yaccel;
+    g_object1_rotate += 0.001f * delta_time;
 
-    SDL_GL_SwapWindow(displayWindow);
+    g_object1_matrix = glm::rotate(g_object1_matrix, glm::radians(g_object1_rotate), glm::vec3(0.0f, 0.0f, 1.0f));
+    g_object2_matrix = glm::translate(g_object2_matrix, glm::vec3(g_object2_x, g_object2_y, 0.0f));
+
 }
+
+void draw_object(glm::mat4& object_model_matrix, GLuint& object_texture_id) {
+    g_program.set_model_matrix(object_model_matrix);
+    glBindTexture(GL_TEXTURE_2D, object_texture_id);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
 
 void render() {
     glClear(GL_COLOR_BUFFER_BIT);
 
-    g_program.set_model_matrix(g_triangle1_matrix);
-    g_program2.set_model_matrix(g_triangle2_matrix);
+    g_program.set_model_matrix(g_object1_matrix);
+    // g_program2.set_model_matrix(g_triangle2_matrix);
 
     float vertices[] =
     {
-        1.0f, -0.5f, 0.0f, 0.5f, -0.5f, -0.5f,
-        3.0f, -0.5f, 3.0f, 0.5f, 2.5f, -0.5f
+        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
     };
 
     glVertexAttribPointer(g_program.get_position_attribute(), 2, GL_FLOAT, false, 0, vertices);
     glEnableVertexAttribArray(g_program.get_position_attribute());
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    float texture_coordinates[] = {
+        0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f
+    };
+
+    glVertexAttribPointer(g_program.get_tex_coordinate_attribute(), 2, GL_FLOAT, false, 0, texture_coordinates);
+    glEnableVertexAttribArray(g_program.get_tex_coordinate_attribute());
+
+    //glBindTexture(GL_TEXTURE_2D, object_texture_id);
+    //glDrawArrays(GL_TRIANGLES, 0, 6);
+    draw_object(g_object1_matrix, object_texture_id);
+    
+
     glDisableVertexAttribArray(g_program.get_position_attribute());
+    glDisableVertexAttribArray(g_program.get_tex_coordinate_attribute());
+
+    // object 2
+    
+    g_program.set_model_matrix(g_object2_matrix);
+    /*
+    float vertices2[] =
+    {
+        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
+    };
+    */
+    glVertexAttribPointer(g_program.get_position_attribute(), 2, GL_FLOAT, false, 0, vertices);
+    glEnableVertexAttribArray(g_program.get_position_attribute());
+
+    /*
+    float texture_coordinates2[] = {
+        0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f
+    };
+    */
+    glVertexAttribPointer(g_program.get_tex_coordinate_attribute(), 2, GL_FLOAT, false, 0, texture_coordinates);
+    glEnableVertexAttribArray(g_program.get_tex_coordinate_attribute());
+
+    //glBindTexture(GL_TEXTURE_2D, object_texture_id);
+    //glDrawArrays(GL_TRIANGLES, 0, 6);
+    draw_object(g_object2_matrix, object2_texture_id);
 
 
-    glVertexAttribPointer(g_program2.get_position_attribute(), 2, GL_FLOAT, false, 0, vertices);
+    glDisableVertexAttribArray(g_program.get_position_attribute()); 
+    glDisableVertexAttribArray(g_program.get_tex_coordinate_attribute());
+
+
+
+    /*
+    float vertices2[] =
+    {
+        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
+    };
+
+
+    glVertexAttribPointer(g_program2.get_position_attribute(), 2, GL_FLOAT, false, 0, vertices2);
     glEnableVertexAttribArray(g_program2.get_position_attribute());
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
     glDisableVertexAttribArray(g_program2.get_position_attribute());
-
+    */
 
     SDL_GL_SwapWindow(displayWindow);
 
@@ -159,7 +317,7 @@ int main(int argc, char* argv[]) {
 
         process_input();
 
-        // update();
+        update();
 
         render();
     }
