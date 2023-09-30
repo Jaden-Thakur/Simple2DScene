@@ -1,0 +1,4 @@
+﻿  main.cpp
+C:\Users\drago\source\repos\Simple2DScene\Simple2DScene\main.cpp(44,6): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\drago\source\repos\Simple2DScene\Simple2DScene\main.cpp(45,6): warning C4305: 'initializing': truncation from 'double' to 'float'
+  Simple2DScene.vcxproj -> C:\Users\drago\source\repos\Simple2DScene\Simple2DScene\Debug\Simple2DScene.exe
