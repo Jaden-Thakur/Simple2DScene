@@ -48,13 +48,6 @@ VIEWPORT_Y = 0,
 VIEWPORT_WIDTH = WINDOW_WIDTH,
 VIEWPORT_HEIGHT = WINDOW_HEIGHT;
 
-// Triangle 1
-const float TR = 1.0,
-TB = 0.4,
-TG = 0.4,
-TO = 1.0;
-
-
 // Textures
 const char V_SHADER_PATH[] = "shaders/vertex_textured.glsl";
 const char F_SHADER_PATH[] = "shaders/fragment_textured.glsl";
@@ -66,30 +59,30 @@ GLuint object_texture_id;
 GLuint object2_texture_id;
 
 ShaderProgram g_program;
-// ShaderProgram g_program2;
+
+
 glm::mat4 g_view_matrix; // cam orientation
 glm::mat4 g_projection_matrix; //cam characteristics
 glm::mat4 g_object1_matrix; //pos matrix of object 1
 glm::mat4 g_object2_matrix; //pos matrix of object 2
 
 // Tranforms
-glm::vec3 g_object1_position = glm::vec3(0.0f, 0.0f, 0.0f);
+
 float g_object1_x = 0.0f;
 float g_object1_y = 0.0f;
 float g_object1_rotate = 0.0f;
 
-glm::vec3 g_object2_position = glm::vec3(0.0f, 0.0f, 0.0f);
 float g_object2_x = 0.0f;
 float g_object2_y = 0.0f;
 float g_object2_rotate = 0.0f;
+float g_object2_scale_factor = 0.9f;
 
-// glm::vec3 g_object_movement = glm::vec3(0.0f, 0.0f, 0.0f);
 
 bool gameIsRunning = true;
 
-const int NUMBER_OF_TEXTURES = 1; // to be generated, that is
-const GLint LEVEL_OF_DETAIL = 0; // base image level; Level n is the nth mipmap reduction image
-const GLint TEXTURE_BORDER = 0; // this value MUST be zero
+const int NUMBER_OF_TEXTURES = 1; 
+const GLint LEVEL_OF_DETAIL = 0; 
+const GLint TEXTURE_BORDER = 0; 
 
 
 
@@ -153,18 +146,9 @@ void initialize() {
     g_program.set_view_matrix(g_view_matrix);
     g_program.set_projection_matrix(g_projection_matrix);
 
-    /*
-    g_program2.set_view_matrix(g_view_matrix);
-    g_program2.set_projection_matrix(g_projection_matrix);
-    */
 
-
-    //g_program.set_colour(TR, TB, TG, TO);
     glUseProgram(g_program.get_program_id());
-    /*
-    g_program2.set_colour(1.0f, 1.0f, 1.0f, 1.0f);
-    glUseProgram(g_program2.get_program_id());
-    */
+
     //Background color
     glClearColor(BG_RED, BG_BLUE, BG_GREEN, BG_ALPHA);
 
@@ -208,7 +192,11 @@ void update() {
     g_object2_y += 1.0f * delta_time;
     g_object1_rotate = 10.0f * delta_time;
     g_object2_rotate += 90.0f * delta_time;
-  
+
+    glm::vec3 shrink_vector = glm::vec3(g_object2_scale_factor, g_object2_scale_factor, 1.0f);
+    if (g_object2_scale_factor > 0) {
+        g_object2_scale_factor -= 0.15 * delta_time;
+    }
     frames++;
     if (frames <= let_go_frame) {
         g_object1_matrix = glm::translate(g_object1_matrix, glm::vec3(g_object1_x, g_object1_y, 0.0f));
@@ -217,6 +205,7 @@ void update() {
     else {
         g_object2_matrix = glm::translate(g_object1_matrix, glm::vec3(g_object2_x, g_object2_y, 0.0f));
         g_object2_matrix = glm::rotate(g_object2_matrix, glm::radians(g_object2_rotate), glm::vec3(0.0f, 0.0f, 1.0f));
+        g_object2_matrix = glm::scale(g_object2_matrix, shrink_vector);
     }
 
    
