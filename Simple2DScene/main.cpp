@@ -146,7 +146,8 @@ void initialize() {
 
     g_view_matrix = glm::mat4(1.0f);
     g_object1_matrix = glm::mat4(1.0f);
-    g_object2_matrix = glm::mat4(1.0f);
+    g_object1_matrix = glm::translate(g_object1_matrix, glm::vec3(-4.0f, -2.0f, 0.0f));
+    g_object2_matrix = glm::translate(g_object1_matrix, glm::vec3(0.0f, 0.75f, 0.0f));
     g_projection_matrix = glm::ortho(-5.0f, 5.0f, -3.75f, 3.75f, -1.0f, 1.0f);
 
     g_program.set_view_matrix(g_view_matrix);
@@ -167,7 +168,6 @@ void initialize() {
     //Background color
     glClearColor(BG_RED, BG_BLUE, BG_GREEN, BG_ALPHA);
 
-    LOG(g_object2_x);
 }
 
 
@@ -181,6 +181,11 @@ void process_input() {
 }
 
 float g_previous_ticks = 0.0f;
+int frames = 0;
+int let_go_frame = 1500;
+bool moving_right = true;
+
+void shutdown();
 
 void update() {
 
@@ -191,30 +196,31 @@ void update() {
     float delta_time = ticks - g_previous_ticks;
     g_previous_ticks = ticks;
 
-    float xaccel = 0.001f * delta_time;
-    float yaccel = 0.001f * delta_time;
+    
+
     
     // Do transformations here
-    if (g_object2_x >= 100) {
-        xaccel = -xaccel;
-    }
-    else if (g_object2_x <= 0) {
-        xaccel = -xaccel;
-    }
-    if (g_object2_y >= 100) {
-        yaccel = -yaccel;
-    }
-    else if (g_object2_y <= 0) {
-        yaccel = -yaccel;
-    }
+
     
-    g_object2_x += xaccel;
-    g_object2_y += yaccel;
-    g_object1_rotate += 0.001f * delta_time;
+    g_object1_x = 3.0f * delta_time;
+    g_object1_y = 1.5f * delta_time;
+    g_object2_x += 1.0f * delta_time;
+    g_object2_y += 1.0f * delta_time;
+    g_object1_rotate = 10.0f * delta_time;
+    g_object2_rotate += 90.0f * delta_time;
+  
+    frames++;
+    if (frames <= let_go_frame) {
+        g_object1_matrix = glm::translate(g_object1_matrix, glm::vec3(g_object1_x, g_object1_y, 0.0f));
+        g_object2_matrix = glm::translate(g_object1_matrix, glm::vec3(0.0f, 0.75f, 0.0f));
+    }
+    else {
+        g_object2_matrix = glm::translate(g_object1_matrix, glm::vec3(g_object2_x, g_object2_y, 0.0f));
+        g_object2_matrix = glm::rotate(g_object2_matrix, glm::radians(g_object2_rotate), glm::vec3(0.0f, 0.0f, 1.0f));
+    }
 
-    g_object1_matrix = glm::rotate(g_object1_matrix, glm::radians(g_object1_rotate), glm::vec3(0.0f, 0.0f, 1.0f));
-    g_object2_matrix = glm::translate(g_object2_matrix, glm::vec3(g_object2_x, g_object2_y, 0.0f));
-
+   
+   
 }
 
 void draw_object(glm::mat4& object_model_matrix, GLuint& object_texture_id) {
@@ -228,7 +234,7 @@ void render() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     g_program.set_model_matrix(g_object1_matrix);
-    // g_program2.set_model_matrix(g_triangle2_matrix);
+
 
     float vertices[] =
     {
@@ -247,8 +253,7 @@ void render() {
     glVertexAttribPointer(g_program.get_tex_coordinate_attribute(), 2, GL_FLOAT, false, 0, texture_coordinates);
     glEnableVertexAttribArray(g_program.get_tex_coordinate_attribute());
 
-    //glBindTexture(GL_TEXTURE_2D, object_texture_id);
-    //glDrawArrays(GL_TRIANGLES, 0, 6);
+
     draw_object(g_object1_matrix, object_texture_id);
     
 
@@ -258,48 +263,19 @@ void render() {
     // object 2
     
     g_program.set_model_matrix(g_object2_matrix);
-    /*
-    float vertices2[] =
-    {
-        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
-        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
-    };
-    */
+
     glVertexAttribPointer(g_program.get_position_attribute(), 2, GL_FLOAT, false, 0, vertices);
     glEnableVertexAttribArray(g_program.get_position_attribute());
 
-    /*
-    float texture_coordinates2[] = {
-        0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f
-    };
-    */
     glVertexAttribPointer(g_program.get_tex_coordinate_attribute(), 2, GL_FLOAT, false, 0, texture_coordinates);
     glEnableVertexAttribArray(g_program.get_tex_coordinate_attribute());
 
-    //glBindTexture(GL_TEXTURE_2D, object_texture_id);
-    //glDrawArrays(GL_TRIANGLES, 0, 6);
+
     draw_object(g_object2_matrix, object2_texture_id);
 
 
     glDisableVertexAttribArray(g_program.get_position_attribute()); 
     glDisableVertexAttribArray(g_program.get_tex_coordinate_attribute());
-
-
-
-    /*
-    float vertices2[] =
-    {
-        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
-        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
-    };
-
-
-    glVertexAttribPointer(g_program2.get_position_attribute(), 2, GL_FLOAT, false, 0, vertices2);
-    glEnableVertexAttribArray(g_program2.get_position_attribute());
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glDisableVertexAttribArray(g_program2.get_position_attribute());
-    */
 
     SDL_GL_SwapWindow(displayWindow);
 
